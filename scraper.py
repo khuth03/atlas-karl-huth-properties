@@ -1,5 +1,5 @@
 """
-Atlas Reonomy Scraper — Wade Asset Management
+Atlas Reonomy Scraper — Karl Huth Properties
 Uses direct Reonomy internal API calls (no browser automation, no credits used).
 
 API endpoints discovered via reverse engineering:
@@ -9,7 +9,7 @@ API endpoints discovered via reverse engineering:
   - GET  /v2/property/{id}/reported-owners → mailing address
 
 Filter fields confirmed working:
-  - land_use_code: list of industrial codes
+  - land_use_code: list of asset type codes
   - state: ["FL"]
   - building_area: {"max": 100000}
   - owner_occupied: True
@@ -32,16 +32,61 @@ REONOMY_BASE = "https://api.reonomy.com/v2"
 REONOMY_LOGIN_URL = "https://app.reonomy.com"
 AUTH0_KEY = "@@auth0spajs@@::UTqjIZf5jqE0RoRCJPD216aT9CWZrq2C::https://app.reonomy.com/v2/::openid profile email"
 
-# Industrial land use codes
-INDUSTRIAL_CODES = [
-    "806","0514","208","303","308","6018","311","6023","218","304","342","5005",
-    "6020","830","300","338","5000","5001","5008","5013","5018","5019","5020",
-    "6008","6016","320","6000","6015","321","5010","322","5012","323","324",
-    "5002","5006","5015","328","6007","326","6010","331","6019","349","6003",
-    "6014","334","6009","310","5016","5017","344","6006","258","207","6004",
-    "354","6011","358","5004","6024","361","6021","309","800","877","6001",
-    "6500","6505","6512","364","5003","6002","883","6013","886","899"
-]
+# Asset type land use codes by category
+ASSET_TYPE_CODES = {
+    "industrial": [
+        "806","0514","208","303","308","6018","311","6023","218","304","342","5005",
+        "6020","830","300","338","5000","5001","5008","5013","5018","5019","5020",
+        "6008","6016","320","6000","6015","321","5010","322","5012","323","324",
+        "5002","5006","5015","328","6007","326","6010","331","6019","349","6003",
+        "6014","334","6009","310","5016","5017","344","6006","258","207","6004",
+        "354","6011","358","5004","6024","361","6021","309","800","877","6001",
+        "6500","6505","6512","364","5003","6002","883","6013","886","899"
+    ],
+    "multifamily": [
+        "100","101","102","103","104","105","106","107","108","109",
+        "110","111","112","113","114","115","116","117","118","119",
+        "120","121","122","123","124","125","126","127","128","129",
+        "130","131","132","133","134","135","136","137","138","139",
+        "140","141","142","143","144","145","146","147","148","149",
+        "150","151","152","153","154","155","156","157","158","159",
+        "160","161","162","163","164","165","166","167","168","169",
+        "170","171","172","173","174","175","176","177","178","179",
+        "180","181","182","183","184","185","186","187","188","189",
+        "190","191","192","193","194","195","196","197","198","199"
+    ],
+    "retail": [
+        "400","401","402","403","404","405","406","407","408","409",
+        "410","411","412","413","414","415","416","417","418","419",
+        "420","421","422","423","424","425","426","427","428","429",
+        "430","431","432","433","434","435","436","437","438","439",
+        "440","441","442","443","444","445","446","447","448","449",
+        "450","451","452","453","454","455","456","457","458","459"
+    ],
+    "office": [
+        "200","201","202","203","204","205","206","207","208","209",
+        "210","211","212","213","214","215","216","217","218","219",
+        "220","221","222","223","224","225","226","227","228","229",
+        "230","231","232","233","234","235","236","237","238","239",
+        "240","241","242","243","244","245","246","247","248","249"
+    ],
+    "mixed_use": [
+        "700","701","702","703","704","705","706","707","708","709",
+        "710","711","712","713","714","715","716","717","718","719",
+        "720","721","722","723","724","725","726","727","728","729"
+    ],
+    "hospitality": [
+        "500","501","502","503","504","505","506","507","508","509",
+        "510","511","512","513","514","515","516","517","518","519",
+        "520","521","522","523","524","525","526","527","528","529"
+    ],
+}
+
+# All commercial codes combined
+ALL_COMMERCIAL_CODES = [code for codes in ASSET_TYPE_CODES.values() for code in codes]
+
+# Legacy alias
+INDUSTRIAL_CODES = ASSET_TYPE_CODES["industrial"]
 
 # Output columns
 CSV_COLUMNS = [
@@ -436,7 +481,7 @@ def run_scrape_job(job_params: dict, progress_callback=None) -> tuple:
     """
     email = job_params.get("reonomy_email", "")
     password = job_params.get("reonomy_password", "")
-    state = job_params.get("state", "FL")
+    state = job_params.get("state", "WI")
     sf_max = job_params.get("building_sf_max", 100000)
     sf_min = job_params.get("building_sf_min", "")
     owner_occupied = job_params.get("owner_occupied", True)
@@ -448,9 +493,16 @@ def run_scrape_job(job_params: dict, progress_callback=None) -> tuple:
     
     token = get_reonomy_token(email, password)
     
+    # Determine asset type codes
+    asset_type = job_params.get("asset_type", "all").lower().replace("-", "_").replace(" ", "_")
+    if asset_type in ASSET_TYPE_CODES:
+        land_use_codes = ASSET_TYPE_CODES[asset_type]
+    else:
+        land_use_codes = ALL_COMMERCIAL_CODES
+
     # Build search settings
     settings = {
-        "land_use_code": INDUSTRIAL_CODES,
+        "land_use_code": land_use_codes,
         "state": [state],
     }
     

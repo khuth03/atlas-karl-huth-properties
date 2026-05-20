@@ -75,7 +75,7 @@ LOGIN_HTML = """<!DOCTYPE html>
   <h1>Your full-time<br><span>data team,</span><br>built into one app.</h1>
   <p class="subtitle">Atlas connects to Reonomy, county records, and AI to surface motivated commercial sellers in your market — every single day.</p>
   <div class="pills">
-    <div class="pill">🏭 Industrial Properties</div>
+    <div class="pill">🏗 Multi-Family &amp; Commercial Properties</div>
     <div class="pill">📞 Owner Contact Info</div>
     <div class="pill">💰 Tax & Mortgage Data</div>
     <div class="pill">🎯 Owner Occupied</div>
@@ -214,12 +214,13 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <div class="form-group">
             <label>Property Type</label>
             <select name="property_type" id="property_type">
-              <option value="Industrial" selected>Industrial</option>
-              <option value="Office">Office</option>
-              <option value="Retail">Retail</option>
-              <option value="Multifamily">Multifamily</option>
-              <option value="Mixed Use">Mixed Use</option>
-              <option value="Land">Land</option>
+              <option value="all" selected>All Commercial</option>
+              <option value="multifamily">Multi-Family</option>
+              <option value="industrial">Industrial</option>
+              <option value="office">Office</option>
+              <option value="retail">Retail</option>
+              <option value="mixed_use">Mixed Use</option>
+              <option value="hospitality">Hospitality</option>
             </select>
           </div>
           <div class="form-group">
@@ -468,16 +469,16 @@ def api_test():
     if not session.get("logged_in"):
         return jsonify({"error": "Not authenticated"}), 401
     try:
-        from scraper import get_reonomy_token, INDUSTRIAL_CODES
+        from scraper import get_reonomy_token, ALL_COMMERCIAL_CODES
         import requests as req
         token = get_reonomy_token(REONOMY_EMAIL, REONOMY_PASSWORD)
-        # Quick count query for WI industrial
+        # Quick count query for WI all commercial
         headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-        payload = {"filters": {"land_use_code": INDUSTRIAL_CODES, "state": ["WI"]}, "page": {"size": 1}}
+        payload = {"filters": {"land_use_code": ALL_COMMERCIAL_CODES, "state": ["WI"]}, "page": {"size": 1}}
         resp = req.post("https://api.reonomy.com/v2/properties/search", json=payload, headers=headers, timeout=15)
         if resp.status_code == 200:
             total = resp.json().get("total", {}).get("value", 0)
-            return jsonify({"ok": True, "message": f"Connected — {total:,} Wisconsin industrial properties available"})
+            return jsonify({"ok": True, "message": f"Connected — {total:,} Wisconsin commercial properties available"})
         else:
             return jsonify({"ok": False, "error": f"API returned {resp.status_code}: {resp.text[:200]}"})
     except Exception as e:
@@ -501,8 +502,9 @@ def api_scrape():
         "logs": [],
         "error": None,
         # Scrape params
-        "state": data.get("state", "FL"),
-        "property_types": [data.get("property_type", "Industrial")],
+        "state": data.get("state", "WI"),
+        "asset_type": data.get("property_type", "all"),
+        "property_types": [data.get("property_type", "all")],
         "building_sf_max": data.get("building_sf_max", ""),
         "building_sf_min": data.get("building_sf_min", ""),
         "owner_occupied": data.get("owner_occupied", True),
