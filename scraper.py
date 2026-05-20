@@ -23,7 +23,7 @@ import re
 import os
 import threading
 import requests
-from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+# playwright not needed - token provided via REONOMY_TOKEN env var
 
 logger = logging.getLogger("atlas-scraper")
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
@@ -143,59 +143,11 @@ def get_reonomy_token(email: str, password: str) -> str:
 
 
 def _login_and_get_token(email: str, password: str) -> tuple:
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
-        ctx = browser.new_context()
-        page = ctx.new_page()
-        try:
-            logger.info("Navigating to Reonomy...")
-            page.goto(REONOMY_LOGIN_URL, wait_until="networkidle", timeout=60000)
-            
-            # Check if already logged in
-            token_data = page.evaluate(
-                f"JSON.parse(localStorage.getItem({json.dumps(AUTH0_KEY)}) || 'null')"
-            )
-            if token_data:
-                body = token_data.get("body", {})
-                expires_at = token_data.get("expiresAt", 0)
-                if expires_at > time.time() + 300:
-                    logger.info("Found valid token in localStorage")
-                    return body["access_token"], expires_at
-            
-            # Log in
-            logger.info("Logging in to Reonomy...")
-            # Wait for login form
-            try:
-                page.wait_for_selector("#username, input[type='email']", timeout=15000)
-                page.fill("#username, input[type='email']", email)
-                page.fill("#password, input[type='password']", password)
-                page.click("button[type='submit']")
-                page.wait_for_load_state("networkidle", timeout=60000)
-            except Exception as e:
-                logger.warning("Login attempt 1 failed: %s", e)
-                # Try clicking login button first
-                try:
-                    page.click("text=Log in", timeout=5000)
-                    page.wait_for_selector("#username", timeout=10000)
-                    page.fill("#username", email)
-                    page.fill("#password", password)
-                    page.click("button[type='submit']")
-                    page.wait_for_load_state("networkidle", timeout=60000)
-                except Exception as e2:
-                    logger.error("Login failed: %s", e2)
-                    raise
-            
-            token_data = page.evaluate(
-                f"JSON.parse(localStorage.getItem({json.dumps(AUTH0_KEY)}) || 'null')"
-            )
-            if not token_data:
-                raise ValueError("No auth token found after login")
-            
-            body = token_data.get("body", {})
-            expires_at = token_data.get("expiresAt", 0)
-            return body["access_token"], expires_at
-        finally:
-            browser.close()
+    # Browser login not available in production — token must be set via REONOMY_TOKEN env var
+    raise RuntimeError(
+        "REONOMY_TOKEN env var is expired or missing. "
+        "Please refresh the token via the Reonomy website and update the Railway env var."
+    )
 
 
 def _headers(token: str) -> dict:
