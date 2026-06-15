@@ -166,7 +166,7 @@ def login():
             session["logged_in"] = True
             return redirect(url_for("dashboard"))
         error = "Invalid credentials. Please try again."
-    return LOGIN_HTML.replace("{{ERROR}}", f'<div class="error">{error}</div>' if error else "")
+    return LOGIN_HTML.replace("{ERROR}", f'<div class="error">{error}</div>' if error else "")
 
 
 @app.route("/logout")
